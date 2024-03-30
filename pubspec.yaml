@@ -1,0 +1,15 @@
+name: fl_list_wheel
+description: "Extended ListWheelScrollView and CupertinoPicker, and added multiple pickers such as DateTimePicker."
+version: 0.0.1
+repository: https://github.com/Wayaer/fl_list_wheel
+
+environment:
+  sdk: '>=3.3.2 <4.0.0'
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^3.0.2
