@@ -64,8 +64,9 @@ void initState() {
 
 ### `FlListWheel` and `FlListWheelState`
 
-`FlListWheelState` can manage `FixedExtentScrollController` init and dispose
-`FlListWheelState` 可以自己管理 `FixedExtentScrollController` init 和 dispose
+#### `FlListWheelState` can manage `FixedExtentScrollController` init and dispose
+
+#### `FlListWheelState` 可以自己管理 `FixedExtentScrollController` init 和 dispose
 
 ```dart
 Widget build() {
