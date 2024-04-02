@@ -2,7 +2,7 @@ part of 'picker.dart';
 
 extension ExtensionMultiListWheelPicker on MultiListWheelPicker {
   Future<List<int>?> show() async {
-    final result = await FlListWheel.push?.call(this);
+    final result = await FlListWheel.pushFun.call(this);
     return result is List<int> ? result : null;
   }
 }
@@ -119,7 +119,7 @@ class PickerLinkageItem<T> {
 
 extension ExtensionMultiListWheelLinkagePicker on MultiListWheelLinkagePicker {
   Future<List<int>?> show() async {
-    final result = await FlListWheel.push?.call(this);
+    final result = await FlListWheel.pushFun.call(this);
     return result is List<int> ? result : null;
   }
 }
@@ -233,7 +233,8 @@ class _MultiListWheelLinkagePickerState<T>
         }).toList());
 
     if (widget.isScrollable) {
-      current = SingleChildScrollView(child: current);
+      current = SingleChildScrollView(
+          scrollDirection: Axis.horizontal, child: current);
     }
     current =
         SizedBox(width: widget.width, height: widget.height, child: current);

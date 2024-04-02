@@ -2,7 +2,7 @@ part of 'picker.dart';
 
 extension ExtensionDatePicker on DatePicker {
   Future<DateTime?> show() async {
-    final result = await FlListWheel.push?.call(this);
+    final result = await FlListWheel.pushFun.call(this);
     if (result is List<int> && key != null) {
       return (key as GlobalKey<_DatePickerState>)
           .currentState

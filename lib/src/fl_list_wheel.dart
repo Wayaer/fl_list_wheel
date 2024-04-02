@@ -9,13 +9,23 @@ class FlListWheel extends StatelessWidget {
   /// Set the global [FlListWheel] configuration
   static WheelOptions wheelOptions = const WheelOptions.cupertino();
 
-  static GlobalKey<NavigatorState>? navigatorKey;
-
   /// push
   static FlListWheelPickerPushCallback? push;
 
+  /// get push
+  static FlListWheelPickerPushCallback get pushFun {
+    assert(push != null, 'You must first assign a value to "push"');
+    return push!;
+  }
+
   /// pop
   static FlListWheelPickerPopCallback? pop;
+
+  /// get pop
+  static FlListWheelPickerPopCallback get popFun {
+    assert(pop != null, 'You must first assign a value to "pop"');
+    return pop!;
+  }
 
   const FlListWheel({
     super.key,

@@ -2,7 +2,7 @@ part of 'picker.dart';
 
 extension ExtensionDateTimePicker on DateTimePicker {
   Future<DateTime?> show() async {
-    final result = await FlListWheel.push?.call(this);
+    final result = await FlListWheel.pushFun.call(this);
     return result is DateTime ? result : null;
   }
 }
@@ -291,11 +291,11 @@ class _DateTimePickerState extends State<DateTimePicker> {
       }));
     }
     final dateTime = SizedBox(
-      width: widget.width,
-      height: widget.height,
-      child: Row(
-          mainAxisAlignment: MainAxisAlignment.center, children: rowChildren),
-    );
+        width: widget.width,
+        height: widget.height,
+        child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: rowChildren));
     if (widget.options == null) return dateTime;
     return PickerSubject<DateTime>(
         options: widget.options!, confirmTap: currentDateTime, child: dateTime);
@@ -333,9 +333,9 @@ class _DateTimePickerState extends State<DateTimePicker> {
           children: [Expanded(child: current), buildUnit(unit)]);
     }
 
-    return SizedBox(
-        width: widget.itemWidth,
-        child: widget.itemWidth == null ? Expanded(child: current) : current);
+    return widget.itemWidth == null
+        ? Expanded(child: current)
+        : SizedBox(width: widget.itemWidth, child: current);
   }
 
   Widget buildUnit(String? unit) =>

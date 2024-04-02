@@ -2,7 +2,7 @@ part of 'picker.dart';
 
 extension ExtensionSingleListPicker on SingleListPicker {
   Future<List<int>?> show() async {
-    final result = await FlListWheel.push?.call(this);
+    final result = await FlListWheel.pushFun.call(this);
     return result is List<int> ? result : null;
   }
 }

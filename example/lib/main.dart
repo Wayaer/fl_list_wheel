@@ -1,4 +1,5 @@
 import 'package:device_preview_minus/device_preview_minus.dart';
+import 'package:example/src/list_wheel_page.dart';
 import 'package:example/src/picker/area_picker.dart';
 import 'package:example/src/picker/date_picker.dart';
 import 'package:example/src/picker/date_time_picker.dart';
@@ -87,6 +88,9 @@ class _HomePageState extends State<HomePage> {
     return ListView(
         padding: const EdgeInsets.symmetric(horizontal: 10),
         children: [
+          ElevatedText('FlListWheel', onTap: () {
+            push(const ListWheelPage());
+          }),
           ElevatedText('DatePicker', onTap: () {
             push(DatePickerPage());
           }),

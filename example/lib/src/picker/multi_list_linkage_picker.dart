@@ -8,7 +8,8 @@ class MultiListLinkagePickerPage extends StatefulWidget {
   const MultiListLinkagePickerPage({super.key});
 
   @override
-  State<MultiListLinkagePickerPage> createState() => _MultiListLinkagePickerState();
+  State<MultiListLinkagePickerPage> createState() =>
+      _MultiListLinkagePickerState();
 }
 
 class _MultiListLinkagePickerState extends State<MultiListLinkagePickerPage> {

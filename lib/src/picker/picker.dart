@@ -205,7 +205,7 @@ class PickerSubject<T> extends StatelessWidget {
                 onTap: () {
                   final T? value = cancelTap?.call();
                   final bool isPop = options.verifyCancel?.call(value) ?? true;
-                  if (isPop) FlListWheel.pop?.call(value);
+                  if (isPop) FlListWheel.popFun.call(value);
                 },
                 child: options.cancel!),
           if (options.title != null) Expanded(child: options.title!),
@@ -214,7 +214,7 @@ class PickerSubject<T> extends StatelessWidget {
                 onTap: () {
                   final T? value = confirmTap?.call();
                   final bool isPop = options.verifyConfirm?.call(value) ?? true;
-                  if (isPop) FlListWheel.pop?.call(value);
+                  if (isPop) FlListWheel.popFun.call(value);
                 },
                 child: options.confirm!),
         ]),
@@ -259,7 +259,7 @@ class _PickerListWheel extends FlListWheel {
 
 extension ExtensionCustomPicker on CustomPicker {
   Future<T?> show<T>() async {
-    final result = await FlListWheel.push?.call(this);
+    final result = await FlListWheel.pushFun.call(this);
     return result is T ? result : null;
   }
 }

@@ -4,7 +4,7 @@ typedef PickerListLinkageItemBuilder = Widget Function(bool selected);
 
 extension ExtensionMultiListLinkagePicker on MultiListLinkagePicker {
   Future<List<int>?> show() async {
-    final result = await FlListWheel.push?.call(this);
+    final result = await FlListWheel.pushFun.call(this);
     return result is List<int> ? result : null;
   }
 }
@@ -92,7 +92,8 @@ class _MultiListLinkagePickerState<T> extends State<MultiListLinkagePicker<T>> {
         }).toList());
 
     if (widget.isScrollable) {
-      current = SingleChildScrollView(child: current);
+      current = SingleChildScrollView(
+          scrollDirection: Axis.horizontal, child: current);
     }
     current =
         SizedBox(width: widget.width, height: widget.height, child: current);
