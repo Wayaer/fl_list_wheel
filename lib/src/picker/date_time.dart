@@ -322,8 +322,8 @@ class _DateTimePickerState extends State<DateTimePicker> {
         list: list,
         startZero: startZero,
         controller: controller,
-        onChanged: (_) {
-          onChanged?.call(_);
+        onChanged: (index) {
+          onChanged?.call(index);
           refreshPosition();
         });
     if (unit != null && unit.isNotEmpty) {

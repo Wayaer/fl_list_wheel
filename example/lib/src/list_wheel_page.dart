@@ -19,26 +19,26 @@ class _ListWheelPageState extends State<ListWheelPage> {
       body: ListView(children: [
         const Partition('ListWheel.builder'),
         addBackboard(FlListWheel.builder(
-            onSelectedItemChanged: (_) {
-              debugPrint('ListWheel.builder : $_');
+            onSelectedItemChanged: (int index) {
+              debugPrint('ListWheel.builder : $index');
             },
             itemBuilder: (_, int index) => Text(numberList[index]),
             itemCount: numberList.length)),
         const Partition('ListWheel.count'),
         addBackboard(FlListWheel.count(
             options: const WheelOptions(),
-            onSelectedItemChanged: (_) {
-              debugPrint('ListWheel.count : $_');
+            onSelectedItemChanged: (index) {
+              debugPrint('ListWheel.count : $index');
             },
             children: numberList.map((item) => Text(item)).toList())),
         const Partition('ListWheelState.builder'),
         addBackboard(FlListWheelState(
             count: numberList.length,
             initialItem: 5,
-            builder: (_) => FlListWheel.builder(
-                controller: _,
-                onSelectedItemChanged: (_) {
-                  debugPrint('ListWheelState.builder : $_');
+            builder: (controller) => FlListWheel.builder(
+                controller: controller,
+                onSelectedItemChanged: (index) {
+                  debugPrint('ListWheelState.builder : $index');
                 },
                 itemBuilder: (_, int index) => Text(numberList[index]),
                 itemCount: numberList.length))),
@@ -46,11 +46,11 @@ class _ListWheelPageState extends State<ListWheelPage> {
         addBackboard(FlListWheelState(
             initialItem: 5,
             count: numberList.length,
-            builder: (_) => FlListWheel.count(
-                controller: _,
+            builder: (controller) => FlListWheel.count(
+                controller: controller,
                 options: const WheelOptions(),
-                onSelectedItemChanged: (_) {
-                  debugPrint('ListWheelState.builder : $_');
+                onSelectedItemChanged: (index) {
+                  debugPrint('ListWheelState.builder : $index');
                 },
                 children: numberList.map((item) => Text(item)).toList()))),
       ]),

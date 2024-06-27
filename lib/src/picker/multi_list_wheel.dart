@@ -289,8 +289,8 @@ class _MultiListWheelLinkagePickerState<T>
       FlListWheelState(
           count: list.length,
           initialItem: position[location],
-          builder: (_) => _PickerListWheel(
-              controller: _,
+          builder: (controller) => _PickerListWheel(
+              controller: controller,
               onChanged: (int index) {
                 position[location] = index;
               },

@@ -1,8 +1,11 @@
 import 'package:fl_list_wheel/fl_list_wheel.dart';
 import 'package:flutter/cupertino.dart';
 
-typedef FlListWheelPickerPushCallback = Future<dynamic> Function(Widget picker);
-typedef FlListWheelPickerPopCallback = void Function(dynamic value);
+typedef FlListWheelPushCallback = Future<dynamic> Function(Widget picker);
+
+typedef FlListWheelPopCallback = void Function(dynamic value);
+
+typedef FlListWheelValueChanged = void Function(int index);
 
 class FlListWheel extends StatelessWidget {
   /// 设置全局 [FlListWheel] 配置
@@ -10,19 +13,19 @@ class FlListWheel extends StatelessWidget {
   static WheelOptions wheelOptions = const WheelOptions.cupertino();
 
   /// push
-  static FlListWheelPickerPushCallback? push;
+  static FlListWheelPushCallback? push;
 
   /// get push
-  static FlListWheelPickerPushCallback get pushFun {
+  static FlListWheelPushCallback get pushFun {
     assert(push != null, 'You must first assign a value to "push"');
     return push!;
   }
 
   /// pop
-  static FlListWheelPickerPopCallback? pop;
+  static FlListWheelPopCallback? pop;
 
   /// get pop
-  static FlListWheelPickerPopCallback get popFun {
+  static FlListWheelPopCallback get popFun {
     assert(pop != null, 'You must first assign a value to "pop"');
     return pop!;
   }
@@ -76,19 +79,19 @@ class FlListWheel extends StatelessWidget {
   final FixedExtentScrollController? controller;
 
   /// 回调监听
-  final ValueChanged<int>? onSelectedItemChanged;
+  final FlListWheelValueChanged? onSelectedItemChanged;
 
   /// 滚动监听 添加此方法  [onScrollStart],[onScrollUpdate],[onScrollEnd] 无效
   final NotificationListenerCallback<ScrollNotification>? onNotification;
 
   /// 滚动开始回调
-  final ValueChanged<int>? onScrollStart;
+  final FlListWheelValueChanged? onScrollStart;
 
   /// 滚动中回调
-  final ValueChanged<int>? onScrollUpdate;
+  final FlListWheelValueChanged? onScrollUpdate;
 
   /// 滚动结束回调
-  final ValueChanged<int>? onScrollEnd;
+  final FlListWheelValueChanged? onScrollEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -152,6 +155,7 @@ class FlListWheel extends StatelessWidget {
 
 typedef FlListWheelStateBuilder = FlListWheel Function(
     FixedExtentScrollController controller);
+
 typedef FlListWheelStateOnScrollController = void Function(
     FixedExtentScrollController controller);
 
