@@ -66,7 +66,7 @@ class BasePickerOptions<T> extends PickerOptions<T> {
       super.decoration,
       super.bottom =
           const Divider(thickness: 0.5, height: 0.5, color: Colors.black12),
-      super.padding = const EdgeInsets.symmetric(horizontal: 10),
+      super.titlePadding = const EdgeInsets.all(12),
       super.contentPadding,
       super.background,
       super.backgroundColor,

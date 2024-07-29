@@ -29,7 +29,7 @@ class PickerOptions<T> {
     this.confirm,
     this.bottom,
     this.bottomNavigationBar,
-    this.padding = const EdgeInsets.symmetric(horizontal: 10),
+    this.titlePadding = const EdgeInsets.all(10),
     this.contentPadding,
     this.backgroundColor,
     this.background,
@@ -63,7 +63,8 @@ class PickerOptions<T> {
   /// [title]顶部内容
   final Widget? top;
 
-  final EdgeInsetsGeometry padding;
+  /// [title]padding
+  final EdgeInsetsGeometry titlePadding;
 
   /// 对内容
   final EdgeInsetsGeometry? contentPadding;
@@ -80,16 +81,18 @@ class PickerOptions<T> {
   final Decoration? decoration;
 
   PickerOptions<T> copyWith({
-    Color? backgroundColor,
     Decoration? decoration,
+    Widget? background,
+    Color? backgroundColor,
     Widget? bottom,
     Widget? top,
-    EdgeInsetsGeometry? padding,
-    Widget? confirm,
-    Widget? cancel,
     Widget? title,
-    Widget? background,
+    EdgeInsetsGeometry? titlePadding,
+    EdgeInsetsGeometry? contentPadding,
+    Widget? bottomNavigationBar,
+    Widget? confirm,
     PickerTapCallback<T>? verifyConfirm,
+    Widget? cancel,
     PickerTapCallback<T>? verifyCancel,
   }) =>
       PickerOptions<T>(
@@ -97,26 +100,30 @@ class PickerOptions<T> {
           backgroundColor: backgroundColor ?? this.backgroundColor,
           bottom: bottom ?? this.bottom,
           top: top ?? this.top,
-          padding: padding ?? this.padding,
+          titlePadding: titlePadding ?? this.titlePadding,
+          contentPadding: contentPadding ?? this.contentPadding,
           title: title ?? this.title,
           confirm: confirm ?? this.confirm,
           cancel: cancel ?? this.cancel,
           background: background ?? this.background,
           verifyConfirm: verifyConfirm ?? this.verifyConfirm,
-          verifyCancel: verifyCancel ?? this.verifyCancel);
+          verifyCancel: verifyCancel ?? this.verifyCancel,
+          bottomNavigationBar: bottomNavigationBar ?? this.bottomNavigationBar);
 
   PickerOptions<T> merge(PickerOptions<T>? options) => copyWith(
       decoration: options?.decoration,
       backgroundColor: options?.backgroundColor,
       top: options?.top,
       bottom: options?.bottom,
-      padding: options?.padding,
+      titlePadding: options?.titlePadding,
+      contentPadding: options?.contentPadding,
       confirm: options?.confirm,
       cancel: options?.cancel,
       title: options?.title,
       background: options?.background,
       verifyConfirm: options?.verifyConfirm,
-      verifyCancel: options?.verifyCancel);
+      verifyCancel: options?.verifyCancel,
+      bottomNavigationBar: options?.bottomNavigationBar);
 }
 
 typedef PickerPositionIndexChanged = void Function(List<int> index);
@@ -197,7 +204,7 @@ class PickerSubject<T> extends StatelessWidget {
         options.title != null ||
         options.confirm != null) {
       column.add(Padding(
-        padding: const EdgeInsets.all(10),
+        padding: options.titlePadding,
         child:
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           if (options.cancel != null)
@@ -222,6 +229,9 @@ class PickerSubject<T> extends StatelessWidget {
     }
     if (options.bottom != null) column.add(options.bottom!);
     Widget content = child;
+    if (options.contentPadding != null) {
+      content = Padding(padding: options.contentPadding!, child: content);
+    }
     if (options.background != null) {
       content = Stack(children: [
         Positioned(
@@ -229,20 +239,16 @@ class PickerSubject<T> extends StatelessWidget {
         content,
       ]);
     }
-    if (options.contentPadding != null) {
-      content = Padding(padding: options.contentPadding!, child: content);
-    }
     column.add(content);
     if (options.bottomNavigationBar != null) {
       column.add(options.bottomNavigationBar!);
     }
 
     return Container(
-      decoration: options.decoration,
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
-      color: options.backgroundColor,
-      child: Column(mainAxisSize: MainAxisSize.min, children: column),
-    );
+        decoration: options.decoration,
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+        color: options.backgroundColor,
+        child: Column(mainAxisSize: MainAxisSize.min, children: column));
   }
 }
 

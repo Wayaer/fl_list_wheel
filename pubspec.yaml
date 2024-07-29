@@ -1,6 +1,6 @@
 name: fl_list_wheel
 description: "Extended ListWheelScrollView and CupertinoPicker, and added multiple pickers such as DateTimePicker."
-version: 0.0.1
+version: 0.0.2
 repository: https://github.com/Wayaer/fl_list_wheel
 
 environment:

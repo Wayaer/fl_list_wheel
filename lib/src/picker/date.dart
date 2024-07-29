@@ -213,7 +213,7 @@ class _DatePickerState extends State<DatePicker> {
                 background: widget.options!.background,
                 bottom: widget.options!.bottom,
                 contentPadding: widget.options!.contentPadding,
-                padding: widget.options!.padding,
+                titlePadding: widget.options!.titlePadding,
                 decoration: widget.options!.decoration,
                 confirm: widget.options!.confirm,
                 cancel: widget.options!.cancel),
