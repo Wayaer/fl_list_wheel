@@ -92,7 +92,7 @@ class Partition extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         width: double.infinity,
-        color: Colors.grey.withOpacity(0.2),
+        color: Colors.grey.withValues(alpha: 0.2),
         alignment: Alignment.center,
         padding: const EdgeInsets.all(10),
         margin: const EdgeInsets.symmetric(vertical: 20),

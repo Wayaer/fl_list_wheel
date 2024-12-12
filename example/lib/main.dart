@@ -55,7 +55,9 @@ class ElevatedText extends StatelessWidget {
   Widget build(BuildContext context) {
     final current = ElevatedButton(onPressed: onTap, child: Text(text));
     if (defaultTargetPlatform == TargetPlatform.android &&
-        defaultTargetPlatform == TargetPlatform.iOS) return current;
+        defaultTargetPlatform == TargetPlatform.iOS) {
+      return current;
+    }
     return Padding(padding: const EdgeInsets.all(10), child: current);
   }
 }
@@ -144,7 +146,7 @@ class _HomePageState extends State<HomePage> {
         content: Container(
             height: 300,
             alignment: Alignment.center,
-            color: Colors.blue.withOpacity(0.2),
+            color: Colors.blue.withValues(alpha: 0.2),
             child: const Text('showCustomPicker',
                 style: TextStyle(color: Colors.black))),
         confirmTap: () {

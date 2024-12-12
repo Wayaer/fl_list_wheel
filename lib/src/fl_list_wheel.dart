@@ -130,26 +130,28 @@ class FlListWheel extends StatelessWidget {
           restorationId: wheelOptions.restorationId,
           scrollBehavior: wheelOptions.scrollBehavior);
     }
-    if (onNotification == null &&
-        onScrollStart == null &&
-        onScrollUpdate == null &&
-        onScrollEnd == null) return child;
-    return NotificationListener<ScrollNotification>(
-        onNotification: (ScrollNotification notification) {
-          onNotification?.call(notification);
-          if (notification is ScrollStartNotification &&
-              onScrollStart != null) {
-            onScrollStart!(controller?.selectedItem ?? 0);
-          } else if (notification is ScrollUpdateNotification &&
-              onScrollUpdate != null) {
-            onScrollUpdate!(controller?.selectedItem ?? 0);
-          } else if (notification is ScrollEndNotification &&
-              onScrollEnd != null) {
-            onScrollEnd!(controller?.selectedItem ?? 0);
-          }
-          return false;
-        },
-        child: child);
+    if (onNotification != null ||
+        onScrollStart != null ||
+        onScrollUpdate != null ||
+        onScrollEnd != null) {
+      return NotificationListener<ScrollNotification>(
+          onNotification: (ScrollNotification notification) {
+            onNotification?.call(notification);
+            if (notification is ScrollStartNotification &&
+                onScrollStart != null) {
+              onScrollStart!(controller?.selectedItem ?? 0);
+            } else if (notification is ScrollUpdateNotification &&
+                onScrollUpdate != null) {
+              onScrollUpdate!(controller?.selectedItem ?? 0);
+            } else if (notification is ScrollEndNotification &&
+                onScrollEnd != null) {
+              onScrollEnd!(controller?.selectedItem ?? 0);
+            }
+            return false;
+          },
+          child: child);
+    }
+    return child;
   }
 }
 

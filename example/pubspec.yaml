@@ -2,13 +2,15 @@ name: example
 description: "A new Flutter project."
 publish_to: 'none'
 version: 1.0.0+1
+
 environment:
   sdk: '>=3.3.2 <4.0.0'
+  flutter: ">=3.27.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  device_preview_minus: ^1.0.6
+  device_preview_minus: ^1.1.0
   fl_list_wheel:
     path: ../
 
