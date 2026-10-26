@@ -1,0 +1,31 @@
+# 发布到 pub.dev 时排除的内容。
+# 存在 .pubignore 时，pub 不再使用根目录的 .gitignore，因此这里同时复刻了其中的规则。
+
+# 构建产物与本地缓存
+.dart_tool/
+build/
+doc/api/
+**/doc/api/
+.pub/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE / 系统文件
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+*.swp
+*.class
+*.log
+*.pyc
+
+# 库本身不需要 lock 文件
+pubspec.lock
+example/pubspec.lock
+
+# 示例的 Web 构建产物约 42 MB，仅用于 GitHub Pages 演示，不随包发布
+example/app/
+**/.last_build_id

@@ -1,28 +1,32 @@
 part of 'picker.dart';
 
-typedef PickerListLinkageItemBuilder = Widget Function(bool selected);
+/// 根据是否选中构建列表项的外观
+typedef FlPickerListLinkageItemBuilder = Widget Function(bool selected);
 
-extension ExtensionMultiListLinkagePicker on MultiListLinkagePicker {
-  Future<List<int>?> show() async {
-    final result = await FlListWheel.pushFun.call(this);
-    return result is List<int> ? result : null;
-  }
+extension FlMultiListLinkagePickerExtension on FlMultiListLinkagePicker {
+  /// 打开选择器弹窗并返回选中的下标路径，取消时返回 null
+  Future<List<int>?> show({FlPickerPresenter? presenter}) =>
+      FlListWheel.showPicker<List<int>>(this, presenter: presenter);
 }
 
-class PickerListLinkageItem<T> {
-  const PickerListLinkageItem(
-      {required this.value, required this.child, this.children = const []});
+/// 列表联动选择的一项
+class FlPickerListLinkageItem<T> {
+  const FlPickerListLinkageItem({required this.value, required this.child, this.children = const []});
 
-  final PickerListLinkageItemBuilder child;
+  /// 根据选中状态构建该项外观
+  final FlPickerListLinkageItemBuilder child;
 
+  /// 该项对应的业务值
   final T value;
 
-  final List<PickerListLinkageItem<T>> children;
+  /// 下一级选项列表
+  final List<FlPickerListLinkageItem<T>> children;
 }
 
-/// 多列选择 联动
-class MultiListLinkagePicker<T> extends PickerStatefulWidget<List<int>> {
-  const MultiListLinkagePicker({
+/// 多列列表联动选择：每列是普通列表，选中某项后展开它的 [FlPickerListLinkageItem.children]。
+/// 常用于省/市/区这类层级数据。
+class FlMultiListLinkagePicker<T> extends FlPickerStatefulWidget<List<int>> {
+  const FlMultiListLinkagePicker({
     super.key,
     super.options,
     super.height = kPickerDefaultHeight,
@@ -31,152 +35,151 @@ class MultiListLinkagePicker<T> extends PickerStatefulWidget<List<int>> {
     required this.items,
     this.value = const [],
     this.isScrollable = true,
+    this.itemExtent,
     this.onChanged,
     this.onValueChanged,
   }) : super(wheelOptions: null);
 
-  /// 要渲染的数据
-  final List<PickerListLinkageItem<T>> items;
+  /// 要渲染的层级数据
+  final List<FlPickerListLinkageItem<T>> items;
 
-  /// 是否可以横向滚动
-  /// [isScrollable]==true 使用[SingleChildScrollView]创建
-  /// [isScrollable]==false 使用[Row] 创建每个滚动，居中显示
+  /// 是否横向滚动：true 时每列宽度为 [itemWidth] 或默认宽度；false 时各列均分宽度
   final bool isScrollable;
 
-  /// 初始默认显示的位置
+  /// 列表项的固定高度；各项高度一致时设置可提升滚动性能，为 null 时按实际高度布局
+  final double? itemExtent;
+
+  /// 初始选中的下标路径
   final List<int> value;
 
-  /// onChanged
-  final PickerPositionIndexChanged? onChanged;
+  /// 选择下标变化回调
+  final FlPickerPositionIndexChanged? onChanged;
 
-  /// onValueChanged
-  final PickerPositionValueChanged<T>? onValueChanged;
+  /// 选择内容变化回调
+  final FlPickerPositionValueChanged<T>? onValueChanged;
 
   @override
-  State<MultiListLinkagePicker<T>> createState() =>
-      _MultiListLinkagePickerState<T>();
+  State<FlMultiListLinkagePicker<T>> createState() => _FlMultiListLinkagePickerState<T>();
 }
 
-class _MultiListLinkagePickerState<T> extends State<MultiListLinkagePicker<T>> {
-  List<PickerListLinkageItem<T>> items = [];
-  List<int?> position = [null];
-  int currentListLength = 0;
+class _FlMultiListLinkagePickerState<T> extends State<FlMultiListLinkagePicker<T>> {
+  late List<FlPickerListLinkageItem<T>> items;
+
+  late List<int?> position;
 
   @override
   void initState() {
     super.initState();
     items = widget.items;
+    position = _initialPosition();
+  }
+
+  /// 末尾保留一个空位，表示下一级尚未选择，点击后继续展开
+  List<int?> _initialPosition() => _clampPosition([for (final int index in widget.value) index, null]);
+
+  /// 按当前数据校正下标，避免数据变化后出现越界位置
+  List<int?> _clampPosition(List<int?> raw) {
+    final List<int?> result = [];
+    List<FlPickerListLinkageItem<T>> currentEntry = items;
+    for (int index = 0; index < raw.length && currentEntry.isNotEmpty; index++) {
+      final int? value = raw[index];
+      if (value == null) {
+        result.add(null);
+        currentEntry = currentEntry.first.children;
+        continue;
+      }
+      final int itemPosition = value < 0 ? 0 : (value >= currentEntry.length ? currentEntry.length - 1 : value);
+      result.add(itemPosition);
+      currentEntry = currentEntry[itemPosition].children;
+    }
+    return result;
   }
 
   @override
-  void didUpdateWidget(covariant MultiListLinkagePicker<T> oldWidget) {
+  void didUpdateWidget(covariant FlMultiListLinkagePicker<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
     items = widget.items;
-    if (mounted) setState(() {});
+    if (!_equalsList(oldWidget.value, widget.value)) {
+      position = _initialPosition();
+    } else if (!identical(oldWidget.items, widget.items)) {
+      position = _clampPosition(position);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    Widget current = Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: buildList.map((item) {
-          Widget current = SizedBox(
-              width: widget.isScrollable && widget.itemWidth == null
-                  ? kPickerDefaultItemWidth
-                  : widget.itemWidth,
-              child: item);
-
-          return !widget.isScrollable && widget.itemWidth == null
-              ? Expanded(child: current)
-              : current;
-        }).toList());
-
-    if (widget.isScrollable) {
-      current = SingleChildScrollView(
-          scrollDirection: Axis.horizontal, child: current);
-    }
-    current =
-        SizedBox(width: widget.width, height: widget.height, child: current);
-    return widget.options == null
-        ? current
-        : PickerSubject<List<int>>(
-            options: widget.options!,
-            confirmTap: () => getPosition,
-            child: current);
+    final Widget current = _FlPickerColumnLayout(
+      columns: buildList,
+      width: widget.width,
+      height: widget.height,
+      isScrollable: widget.isScrollable,
+      itemWidth: widget.itemWidth,
+    );
+    return _buildPicker<List<int>>(options: widget.options, child: current, confirmTap: () => getPosition);
   }
 
-  String lastPosition = '';
+  final _FlPickerPositionTracker tracker = _FlPickerPositionTracker();
 
   List<int> get getPosition {
-    List<int> list = [];
-    for (var element in position) {
-      if (element == null) continue;
+    final List<int> list = [];
+    for (final int? element in position) {
+      if (element == null) break;
       list.add(element);
     }
     return list;
   }
 
   void onChanged() {
-    if (getPosition.toString() != lastPosition) {
-      lastPosition = getPosition.toString();
-      widget.onChanged?.call(getPosition);
-      if (widget.onValueChanged != null) {
-        List<T> value = [];
-        List<PickerListLinkageItem> resultList = items;
-        getPosition.map((index) {
-          if (index < resultList.length) {
-            value.add(resultList[index].value);
-            resultList = resultList[index].children;
-          }
-        }).toList();
-        widget.onValueChanged!(value);
-      }
+    final List<int> current = getPosition;
+    if (!tracker.isChanged(current)) return;
+    widget.onChanged?.call(current);
+    if (widget.onValueChanged == null) return;
+    final List<T> value = [];
+    List<FlPickerListLinkageItem<T>> resultList = items;
+    for (final int index in current) {
+      if (index >= resultList.length) break;
+      value.add(resultList[index].value);
+      resultList = resultList[index].children;
     }
+    widget.onValueChanged!(value);
   }
 
   List<Widget> get buildList {
-    List<Widget> list = [];
-    List<PickerListLinkageItem> currentEntry = items;
-    List.generate(position.length, (index) {
-      var itemPosition = position[index] ?? 0;
-      if (currentEntry.isNotEmpty) {
-        list.add(scrollList(
-            positionIndex: index,
-            positionValue: itemPosition,
-            list: currentEntry));
-        if (itemPosition < currentEntry.length) {
-          currentEntry = currentEntry[itemPosition].children;
-        } else {
-          currentEntry = currentEntry.last.children;
-        }
-      }
-    });
+    final List<Widget> list = [];
+    List<FlPickerListLinkageItem<T>> currentEntry = items;
+    for (int index = 0; index < position.length; index++) {
+      if (currentEntry.isEmpty) break;
+      final int raw = position[index] ?? 0;
+      final int itemPosition = raw < 0 ? 0 : (raw >= currentEntry.length ? currentEntry.length - 1 : raw);
+      list.add(scrollList(positionIndex: index, positionValue: position[index], list: currentEntry));
+      currentEntry = currentEntry[itemPosition].children;
+    }
     return list;
   }
 
-  Widget scrollList(
-          {required List<PickerListLinkageItem> list,
-          required int positionIndex,
-          required int? positionValue}) =>
-      ListView.builder(
-          itemCount: list.length,
-          itemBuilder: (_, int index) {
-            bool selected = position[positionIndex] == index;
-            return GestureDetector(
-                onTap: () {
-                  if (selected) return;
-                  position[positionIndex] = index;
-                  if (positionIndex < position.length - 1) {
-                    position.removeRange(positionIndex + 1, position.length);
-                    position.add(null);
-                  } else {
-                    position.add(null);
-                  }
-                  if (mounted) setState(() {});
-                  onChanged();
-                },
-                child: index > list.length
-                    ? list.last.child(selected)
-                    : list[index].child(selected));
-          });
+  Widget scrollList({
+    required List<FlPickerListLinkageItem<T>> list,
+    required int positionIndex,
+    required int? positionValue,
+  }) => ListView.builder(
+    itemCount: list.length,
+    itemExtent: widget.itemExtent,
+    itemBuilder: (_, int index) {
+      final bool selected = positionValue == index;
+      return GestureDetector(
+        onTap: () {
+          // 已经有明确选择时重复点击不应清空更深层级
+          if (selected) return;
+          position[positionIndex] = index;
+          if (positionIndex < position.length - 1) {
+            position.removeRange(positionIndex + 1, position.length);
+          }
+          position.add(null);
+          if (mounted) setState(() {});
+          onChanged();
+        },
+        child: list[index].child(selected),
+      );
+    },
+  );
 }

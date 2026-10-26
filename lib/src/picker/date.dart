@@ -1,82 +1,79 @@
 part of 'picker.dart';
 
-extension ExtensionDatePicker on DatePicker {
-  Future<DateTime?> show() async {
-    final result = await FlListWheel.pushFun.call(this);
-    if (result is List<int> && key != null) {
-      return (key as GlobalKey<_DatePickerState>)
-          .currentState
-          ?.indexToDatetime(result);
-    }
-    return null;
-  }
+extension FlDatePickerExtension on FlDatePicker {
+  /// 打开选择器弹窗并返回选中的日期，取消时返回 null
+  Future<DateTime?> show({FlPickerPresenter? presenter}) =>
+      FlListWheel.showPicker<DateTime>(this, presenter: presenter);
 }
 
-typedef DatePickerContentBuilder = Widget Function(String content);
+/// 自定义选项文字的渲染方式
+typedef FlDatePickerContentBuilder = Widget Function(String content);
 
-typedef DatePickerUnitBuilder = Widget Function(String? unit);
-
-class DatePicker extends PickerStatefulWidget<DateTime> {
-  DatePicker({
-    Key? key,
+/// 日期选择器：按日期区间生成年/月/日联动滚轮。
+/// 区间内的日期会一次性全部构建，跨度很大时建议改用 [FlDateTimePicker]。
+class FlDatePicker extends FlPickerStatefulWidget<DateTime> {
+  /// 区间跨度上限（天），超出会在 debug 模式下断言失败，避免全量构建拖慢页面
+  static const int maxRangeDays = 366 * 200;
+  FlDatePicker({
+    super.key,
     super.options,
     super.wheelOptions,
     super.height = kPickerDefaultHeight,
     super.width = double.infinity,
     super.itemWidth,
-    this.unit = const DatePickerUnit.yd(),
+    this.unit = const FlDatePickerUnit.yd(),
     this.dual = true,
     this.itemBuilder,
     this.onChanged,
     DateTime? startDate,
     DateTime? defaultDate,
     DateTime? endDate,
-  })  : startDate =
-            startDate ?? DateTime.now().subtract(const Duration(days: 1)),
-        defaultDate = defaultDate ?? DateTime.now(),
-        endDate = endDate ?? DateTime.now(),
-        super(key: key ?? GlobalKey<_DatePickerState>());
+  }) : startDate = startDate ?? DateTime.now().subtract(const Duration(days: 1)),
+       defaultDate = defaultDate ?? DateTime.now(),
+       endDate = endDate ?? DateTime.now();
 
-  /// 补全双位数
+  /// 是否把数字补成两位，如 1 → 01
   final bool dual;
 
-  /// 选择器单位
-  /// 通过单位参数确定是否显示对应的年月日
-  final DatePickerUnit unit;
+  /// 决定显示哪些列，以及每列的单位文字
+  /// 字段为 null 时隐藏该列；为空字符串时显示列但不显示单位文字
+  final FlDatePickerUnit unit;
 
-  final DatePickerContentBuilder? itemBuilder;
+  /// 自定义选项文字的渲染方式；变化时会重建已生成的选项
+  final FlDatePickerContentBuilder? itemBuilder;
 
-  /// 开始时间
+  /// 开始日期
   final DateTime startDate;
 
-  /// 默认选中时间
+  /// 默认选中日期，超出区间时会自动收敛到边界
   final DateTime defaultDate;
 
-  /// 结束时间
+  /// 结束日期
   final DateTime endDate;
 
-  /// onChanged
-  final DateTimePickerChanged? onChanged;
+  /// 选择日期变化回调
+  final FlDateTimePickerChanged? onChanged;
 
   @override
-  State<DatePicker> createState() => _DatePickerState();
+  State<FlDatePicker> createState() => _FlDatePickerState();
 }
 
-class _DateValue {
-  _DateValue(this.value, this.dateTime);
+class _FlDateValue {
+  _FlDateValue(this.value, this.dateTime);
 
   final String value;
   final DateTime dateTime;
 }
 
-class _DatePickerState extends State<DatePicker> {
+class _FlDatePickerState extends State<FlDatePicker> {
   /// 时间
   late DateTime startDate, defaultDate, endDate;
-  bool isScrolling = false;
 
-  late DatePickerUnit unit;
-  late List<PickerLinkageItem<_DateValue>> items;
-  late List<int> position = [];
+  late FlDatePickerUnit unit;
+  late List<FlPickerLinkageItem<_FlDateValue>> items;
+
+  /// 当前每列选中的下标
+  List<int> position = [];
 
   late bool hasYear;
   late bool hasMonth;
@@ -86,208 +83,233 @@ class _DatePickerState extends State<DatePicker> {
   void initState() {
     super.initState();
     initialize();
+    // 与 FlDateTimePicker 对齐：首帧结束后回播一次初始选中值
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final DateTime? datetime = indexToDatetime(position);
+      if (datetime != null) widget.onChanged?.call(datetime);
+    });
   }
 
-  DateTime get initDefaultDate {
-    if (widget.defaultDate.isBefore(startDate)) return startDate;
-    if (widget.defaultDate.isAfter(endDate)) return endDate;
-    return widget.defaultDate;
-  }
-
-  DateTime get initEndDate => startDate.isBefore(widget.endDate)
-      ? widget.endDate
-      : startDate.add(const Duration(days: 1));
-
+  /// 根据单位和日期区间重建联动数据，并计算默认选中位置
   void initialize() {
     items = [];
     unit = widget.unit;
-    startDate = widget.startDate;
-    endDate = initEndDate;
-    defaultDate = initDefaultDate;
-    final rangeDate = startDate.getDaysForRange(endDate);
+    final range = _normalizeDateRange(
+      startDate: widget.startDate,
+      defaultDate: widget.defaultDate,
+      endDate: widget.endDate,
+    );
+    startDate = range.start;
+    defaultDate = range.defaultDate;
+    endDate = range.end;
+    final List<DateTime> rangeDate = startDate.getDaysForRange(endDate);
+    assert(
+      rangeDate.length <= FlDatePicker.maxRangeDays,
+      'FlDatePicker 区间跨度 ${rangeDate.length} 天超过上限 ${FlDatePicker.maxRangeDays} 天，'
+      '区间内的日期会一次性全部构建，请缩小区间或改用 FlDateTimePicker。',
+    );
     int yI = 0;
     int mI = 0;
-    hasMonth = unit.month != null;
     hasYear = unit.year != null;
     hasDay = unit.day != null;
+    // 只有日期没有月份时无法按天分组，自动显示月份列，避免越界
+    hasMonth = unit.month != null || hasDay;
+    // 不显示年份时，同一月份只保留首次出现的一次，避免跨年出现多个“01月”
+    final Set<int> shownMonths = {};
+    bool skipMonth = false;
 
     for (int i = 0; i < rangeDate.length; i++) {
-      final current = rangeDate[i];
+      final DateTime current = rangeDate[i];
       DateTime? previous;
       if (i > 0) previous = rangeDate[i - 1];
       if (hasYear) {
         if (previous != null && current.year == previous.year) {
           if (current.month == previous.month) {
             if (!hasDay) continue;
-            addDay(current, items[yI].children[mI].children, 2);
+            addDay(current, items[yI].children[mI].children);
           } else {
             mI += 1;
             if (!hasMonth) continue;
-            addMonth(current, items[yI].children, 1);
+            addMonth(current, items[yI].children);
           }
         } else {
           if (previous != null) {
             mI = 0;
             yI += 1;
           }
-          final entry = buildEntry(current, current.year, unit.year,
-              hasMonth ? buildEntry(current, current.month, unit.month) : null);
+          final FlPickerLinkageItem<_FlDateValue> entry = buildEntry(
+            current,
+            current.year,
+            unit.year,
+            hasMonth ? buildEntry(current, current.month, unit.month) : null,
+          );
           items.add(entry);
-          if (current.year == defaultDate.year && position.isEmpty) {
-            final i = items.indexOf(entry);
-            position.add(i >= 0 ? i : 0);
-          }
         }
       } else {
         if (previous != null && current.month == previous.month) {
-          if (!hasDay) continue;
-          addDay(current, items[mI].children, 1);
+          if (skipMonth || !hasDay) continue;
+          addDay(current, items[mI].children);
         } else {
-          if (previous != null) mI += 1;
           if (!hasMonth) continue;
-          addMonth(current, items, 0);
+          // 重复出现的月份及其日期一起跳过，保证无年份时每个月份只出现一次
+          if (!shownMonths.add(current.month)) {
+            skipMonth = true;
+            continue;
+          }
+          skipMonth = false;
+          if (previous != null) mI += 1;
+          addMonth(current, items);
         }
       }
     }
+    position = defaultPosition;
   }
 
-  void addDay(
-      DateTime current, List<PickerLinkageItem<_DateValue>> items, int length) {
-    final entry = buildEntry(current, current.day, unit.day);
-    items.add(entry);
-    if (current.format(DateTimeDist.yearDay) ==
-            defaultDate.format(DateTimeDist.yearDay) &&
-        position.length == length) {
-      final i = items.indexOf(entry);
-      position.add(i >= 0 ? i : 0);
+  /// 按年 → 月 → 日逐级查找默认选中项；某一级找不到时退回该级第一项
+  List<int> get defaultPosition {
+    final List<int> result = [];
+    List<FlPickerLinkageItem<_FlDateValue>> current = items;
+    if (hasYear && current.isNotEmpty) {
+      final int index = indexOfItem(current, (item) => item.value.dateTime.year == defaultDate.year);
+      result.add(index < 0 ? 0 : index);
+      current = current[result.last].children;
     }
-  }
-
-  void addMonth(
-      DateTime current, List<PickerLinkageItem<_DateValue>> items, int length) {
-    final entry = buildEntry(current, current.month, unit.month,
-        hasDay ? buildEntry(current, current.day, unit.day) : null);
-    items.add(entry);
-    if (current.format(DateTimeDist.yearMonth) ==
-            defaultDate.format(DateTimeDist.yearMonth) &&
-        position.length == length) {
-      final i = items.indexOf(entry);
-      position.add(i >= 0 ? i : 0);
+    if (hasMonth && current.isNotEmpty) {
+      final int index = indexOfItem(current, (item) => item.value.dateTime.month == defaultDate.month);
+      result.add(index < 0 ? 0 : index);
+      current = current[result.last].children;
     }
+    if (hasDay && current.isNotEmpty) {
+      final int index = indexOfItem(current, (item) => item.value.dateTime.day == defaultDate.day);
+      result.add(index < 0 ? 0 : index);
+    }
+    return result;
   }
 
-  PickerLinkageItem<_DateValue> buildEntry(
-      DateTime dateTime, int value, String? unit,
-      [PickerLinkageItem<_DateValue>? secondary]) {
-    String text = '';
-    text = widget.dual ? value.toString().padLeft(2, '0') : value.toString();
+  int indexOfItem(List<FlPickerLinkageItem<_FlDateValue>> list, bool Function(FlPickerLinkageItem<_FlDateValue>) test) {
+    for (int i = 0; i < list.length; i++) {
+      if (test(list[i])) return i;
+    }
+    return -1;
+  }
+
+  void addDay(DateTime current, List<FlPickerLinkageItem<_FlDateValue>> items) {
+    items.add(buildEntry(current, current.day, unit.day));
+  }
+
+  void addMonth(DateTime current, List<FlPickerLinkageItem<_FlDateValue>> items) {
+    items.add(
+      buildEntry(current, current.month, unit.month, hasDay ? buildEntry(current, current.day, unit.day) : null),
+    );
+  }
+
+  /// 构建一个选项；[secondary] 为下一级的初始子项
+  FlPickerLinkageItem<_FlDateValue> buildEntry(
+    DateTime dateTime,
+    int value,
+    String? unit, [
+    FlPickerLinkageItem<_FlDateValue>? secondary,
+  ]) {
+    String text = widget.dual ? value.toString().padLeft(2, '0') : value.toString();
     Widget buildText() {
       text += unit ?? '';
       return widget.itemBuilder?.call(text) ?? Text(text);
     }
 
-    return PickerLinkageItem<_DateValue>(
-        value: _DateValue(text, dateTime),
-        child: buildText(),
-        children: [if (secondary != null) secondary]);
+    return FlPickerLinkageItem<_FlDateValue>(
+      value: _FlDateValue(text, dateTime),
+      child: buildText(),
+      children: [?secondary],
+    );
   }
 
   @override
-  void didUpdateWidget(covariant DatePicker oldWidget) {
+  void didUpdateWidget(covariant FlDatePicker oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final bool changed =
+        oldWidget.unit != widget.unit ||
+        oldWidget.dual != widget.dual ||
+        oldWidget.itemBuilder != widget.itemBuilder ||
+        oldWidget.startDate != widget.startDate ||
+        oldWidget.defaultDate != widget.defaultDate ||
+        oldWidget.endDate != widget.endDate;
+    if (!changed) return;
     initialize();
-    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    return MultiListWheelLinkagePicker<_DateValue>(
-        items: items,
-        value: position,
-        options: widget.options == null
-            ? null
-            : PickerOptions<List<int>>(
-                top: widget.options!.top,
-                title: widget.options!.title,
-                backgroundColor: widget.options!.backgroundColor,
-                background: widget.options!.background,
-                bottom: widget.options!.bottom,
-                contentPadding: widget.options!.contentPadding,
-                titlePadding: widget.options!.titlePadding,
-                decoration: widget.options!.decoration,
-                confirm: widget.options!.confirm,
-                cancel: widget.options!.cancel),
-        wheelOptions: widget.wheelOptions,
-        onChanged: (List<int> index) {
-          if (widget.onChanged != null) {
-            final datetime = indexToDatetime(index);
-            if (datetime != null) widget.onChanged!(datetime);
-          }
-        },
-        width: widget.width,
-        isScrollable: false,
-        height: widget.height,
-        itemWidth: widget.itemWidth);
+    final Widget wheels = FlMultiListWheelLinkagePicker<_FlDateValue>(
+      items: items,
+      value: position,
+      wheelOptions: widget.wheelOptions,
+      onChanged: (List<int> index) {
+        position = index;
+        if (widget.onChanged != null) {
+          final DateTime? datetime = indexToDatetime(index);
+          if (datetime != null) widget.onChanged!(datetime);
+        }
+      },
+      width: widget.width,
+      isScrollable: false,
+      height: widget.height,
+      itemWidth: widget.itemWidth,
+    );
+    return _buildPicker<DateTime>(
+      options: widget.options,
+      child: wheels,
+      confirmTap: () => indexToDatetime(position) ?? defaultDate,
+    );
   }
 
+  /// 把每列下标转换为选中的日期，下标越界时自动收敛
   DateTime? indexToDatetime(List<int> index) {
-    List<_DateValue> value = [];
-    List<PickerLinkageItem<_DateValue>> resultList = items;
-    for (var element in index) {
-      if (element < resultList.length) {
-        value.add(resultList[element].value);
-        resultList = resultList[element].children;
-      } else {
-        value.add(resultList.last.value);
-        resultList = resultList.last.children;
-      }
+    if (items.isEmpty) return null;
+    FlPickerLinkageItem<_FlDateValue>? selected;
+    List<FlPickerLinkageItem<_FlDateValue>> resultList = items;
+    for (final int element in index) {
+      if (resultList.isEmpty) break;
+      final int i = element < 0 ? 0 : (element >= resultList.length ? resultList.length - 1 : element);
+      selected = resultList[i];
+      resultList = selected.children;
     }
-    if (value.isEmpty) return null;
-    String? year;
-    String? month;
-    String? day;
-    if (hasYear) {
-      year = value.first.value;
-      month = value[1].value;
-      if (hasDay) day = value.last.value;
-    } else {
-      year = value.first.dateTime.year.toString();
-      month = value.first.value;
-      if (hasDay) day = value.last.value;
-    }
-    final now = DateTime.now();
-    return DateTime.tryParse('$year-$month-${day ?? now.day}');
+    if (selected == null) return null;
+    final DateTime dateTime = selected.value.dateTime;
+    return DateTime(dateTime.year, dateTime.month, dateTime.day);
   }
 }
 
-class DatePickerUnit {
-  const DatePickerUnit.none()
-      : year = '',
-        month = '',
-        day = '';
+/// 日期选择器显示哪些列及单位文字。
+/// 字段为 null 时隐藏该列；为空字符串时显示该列但不显示单位文字。
+class FlDatePickerUnit {
+  /// 年/月/日三列都显示，但不显示单位文字
+  const FlDatePickerUnit.none() : year = '', month = '', day = '';
 
-  const DatePickerUnit.yd(
-      {this.year = ' Y', this.month = ' M', this.day = ' D'});
+  /// 年 + 月 + 日
+  const FlDatePickerUnit.yd({this.year = ' Y', this.month = ' M', this.day = ' D'});
 
-  const DatePickerUnit.ym({
-    this.year = ' Y',
-    this.month = ' M',
-  }) : day = null;
+  /// 年 + 月
+  const FlDatePickerUnit.ym({this.year = ' Y', this.month = ' M'}) : day = null;
 
-  const DatePickerUnit.md({
-    this.month = ' M',
-    this.day = ' D',
-  }) : year = null;
+  /// 月 + 日（不显示年份；跨年区间中相同月份按首次出现去重，
+  /// 确认时返回的日期年份取该月首次出现时的年份）
+  const FlDatePickerUnit.md({this.month = ' M', this.day = ' D'}) : year = null;
 
+  /// 年份列单位；null 表示隐藏年份列
   final String? year;
+
+  /// 月份列单位；null 表示隐藏月份列
   final String? month;
+
+  /// 日期列单位；null 表示隐藏日期列
   final String? day;
 
-  int getLength() {
-    int i = 0;
-    if (year != null) i += 1;
-    if (month != null) i += 1;
-    if (day != null) i += 1;
-    return i;
-  }
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FlDatePickerUnit && other.year == year && other.month == month && other.day == day;
+
+  @override
+  int get hashCode => Object.hash(year, month, day);
 }

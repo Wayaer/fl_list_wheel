@@ -1,21 +1,23 @@
 name: example
-description: "A new Flutter project."
+description: "Examples for fl_list_wheel."
 publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.3.2 <4.0.0'
-  flutter: ">=3.27.0"
+  sdk: ^3.13.0
+  flutter: ">=3.47.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  device_preview_minus: ^1.2.0
+  cupertino_icons: ^2.0.0
   fl_list_wheel:
     path: ../
 
 dev_dependencies:
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true

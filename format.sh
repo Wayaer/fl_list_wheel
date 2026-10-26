@@ -1,3 +1,4 @@
-dart format . lib
-dart format . example/lib
+#!/bin/sh
+dart format lib example/lib
 flutter analyze
+(cd example && flutter analyze)

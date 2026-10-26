@@ -1,23 +1,26 @@
 part of 'picker.dart';
 
-extension ExtensionMultiListWheelPicker on MultiListWheelPicker {
-  Future<List<int>?> show() async {
-    final result = await FlListWheel.pushFun.call(this);
-    return result is List<int> ? result : null;
-  }
+extension FlMultiListWheelPickerExtension on FlMultiListWheelPicker {
+  /// 打开选择器弹窗并返回每一列选中的下标，取消时返回 null
+  Future<List<int>?> show({FlPickerPresenter? presenter}) =>
+      FlListWheel.showPicker<List<int>>(this, presenter: presenter);
 }
 
-class PickerItem {
-  const PickerItem({required this.itemCount, required this.itemBuilder});
+/// 一列滚轮的数据与渲染方式
+class FlPickerItem {
+  const FlPickerItem({required this.itemCount, required this.itemBuilder});
 
-  /// 渲染子组件
+  /// 该列的子项数量
   final int itemCount;
+
+  /// 按 index 渲染该列的子项
   final IndexedWidgetBuilder itemBuilder;
 }
 
-/// 多列滚轮选择 不联动
-class MultiListWheelPicker extends PickerStatelessWidget<List<int>> {
-  const MultiListWheelPicker({
+/// 多列滚轮选择（各列互不联动）。
+/// 任一列没有可选项时，确认结果按取消处理（返回 null）。
+class FlMultiListWheelPicker extends FlPickerStatefulWidget<List<int>> {
+  const FlMultiListWheelPicker({
     super.key,
     super.height = kPickerDefaultHeight,
     super.width = double.infinity,
@@ -30,103 +33,125 @@ class MultiListWheelPicker extends PickerStatelessWidget<List<int>> {
     this.value = const [],
   });
 
-  /// 要渲染的数据
-  final List<PickerItem> items;
+  /// 每一列的数据
+  final List<FlPickerItem> items;
 
-  /// 初始默认显示的位置
+  /// 每一列的初始选中下标
   final List<int> value;
 
-  /// 是否可以横向滚动
-  /// [isScrollable]==true 使用[SingleChildScrollView]创建,[wheelOptions]中的[itemWidth]控制宽度，如果不设置则为[kPickerDefaultWidth]
-  /// [isScrollable]==false 使用[Row] 创建每个滚动，居中显示
+  /// 是否横向滚动：true 时每列宽度为 [itemWidth] 或默认宽度；false 时各列均分宽度
   final bool isScrollable;
 
-  /// onIndexChanged
-  final PickerPositionIndexChanged? onChanged;
+  /// 某一列滚动结束时触发，参数为所有列当前的下标
+  final FlPickerPositionIndexChanged? onChanged;
+
+  @override
+  State<FlMultiListWheelPicker> createState() => _FlMultiListWheelPickerState();
+}
+
+class _FlMultiListWheelPickerState extends State<FlMultiListWheelPicker> {
+  /// 当前每列选中的下标，交互过程中由 Wheel 实时更新
+  late List<int> position;
+
+  final _FlPickerPositionTracker tracker = _FlPickerPositionTracker();
+
+  @override
+  void initState() {
+    super.initState();
+    position = _initialPosition();
+  }
+
+  List<int> _initialPosition() => _clampPosition(widget.value);
+
+  /// 按当前列的数据量校正下标，避免越界
+  List<int> _clampPosition(List<int> raw) {
+    final List<int> result = [];
+    for (int i = 0; i < widget.items.length; i++) {
+      final int count = widget.items[i].itemCount;
+      final int value = i < raw.length ? raw[i] : 0;
+      result.add(count <= 0 ? 0 : (value < 0 ? 0 : (value >= count ? count - 1 : value)));
+    }
+    return result;
+  }
+
+  @override
+  void didUpdateWidget(covariant FlMultiListWheelPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_equalsList(oldWidget.value, widget.value) || oldWidget.items.length != widget.items.length) {
+      position = _initialPosition();
+    } else {
+      position = _clampPosition(position);
+    }
+  }
+
+  void onChanged() {
+    final List<int> current = [...position];
+    if (!tracker.isChanged(current)) return;
+    widget.onChanged?.call(current);
+  }
 
   @override
   Widget build(BuildContext context) {
-    List<int> position = [...value];
-    String lastPosition = '';
-    void onChanged() {
-      if (position.length > items.length) {
-        position.removeRange(items.length, position.length);
-      }
-      if (position.toString() != lastPosition) {
-        lastPosition = position.toString();
-        this.onChanged?.call(position);
-      }
+    final List<Widget> children = [];
+    for (int i = 0; i < widget.items.length; i++) {
+      final FlPickerItem item = widget.items[i];
+      final int count = item.itemCount;
+      final int value = position[i] >= count ? (count > 0 ? count - 1 : 0) : position[i];
+      children.add(
+        FlListWheelState(
+          key: ValueKey<int>(i),
+          initialItem: value,
+          count: item.itemCount,
+          builder: (controller) => _FlPickerListWheel(
+            controller: controller,
+            options: widget.wheelOptions,
+            itemBuilder: item.itemBuilder,
+            itemCount: item.itemCount,
+            onChanged: (int index) => position[i] = index,
+            onScrollEnd: (_) => onChanged(),
+          ),
+        ),
+      );
     }
-
-    Widget current = Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: items.asMap().entries.map((item) {
-          if (items.length > position.length) position.add(0);
-          final value = item.value;
-          final location = item.key;
-          FlListWheel buildWheel([FixedExtentScrollController? controller]) =>
-              _PickerListWheel(
-                  controller: controller,
-                  options: wheelOptions,
-                  itemBuilder: value.itemBuilder,
-                  itemCount: value.itemCount,
-                  onChanged: (int index) {
-                    position[location] = index;
-                  },
-                  onScrollEnd: (_) => onChanged());
-
-          Widget current = SizedBox(
-              width: isScrollable && itemWidth == null
-                  ? kPickerDefaultItemWidth
-                  : itemWidth,
-              child: this.value.isEmpty
-                  ? buildWheel()
-                  : FlListWheelState(
-                      initialItem: position[item.key],
-                      builder: buildWheel,
-                      count: value.itemCount));
-          return !isScrollable && itemWidth == null
-              ? Expanded(child: current)
-              : current;
-        }).toList());
-    if (isScrollable) {
-      current = SingleChildScrollView(child: current);
-    }
-    current = SizedBox(width: width, height: height, child: current);
-    return options == null
-        ? current
-        : PickerSubject<List<int>>(
-            options: options!, child: current, confirmTap: () => position);
+    final Widget current = _FlPickerColumnLayout(
+      columns: children,
+      width: widget.width,
+      height: widget.height,
+      isScrollable: widget.isScrollable,
+      itemWidth: widget.itemWidth,
+    );
+    return _buildPicker<List<int>>(
+      options: widget.options,
+      child: current,
+      // 任一列没有可选项时无法给出有效下标，按取消处理
+      confirmTap: () => widget.items.any((FlPickerItem item) => item.itemCount == 0) ? null : [...position],
+    );
   }
 }
 
-class PickerLinkageItem<T> {
-  const PickerLinkageItem(
-      {required this.value, required this.child, this.children = const []});
+/// 滚轮联动选择的一项
+class FlPickerLinkageItem<T> {
+  const FlPickerLinkageItem({required this.value, required this.child, this.children = const []});
 
+  /// 该项的显示内容
   final Widget child;
 
+  /// 该项对应的业务值
   final T value;
 
-  final List<PickerLinkageItem<T>> children;
-
-  Map<String, dynamic> toMap() => {
-        'child': child.runtimeType.toString(),
-        'value': value.toString(),
-        'children': children.map((item) => item.toMap()).toList(),
-      };
+  /// 下一级选项
+  final List<FlPickerLinkageItem<T>> children;
 }
 
-extension ExtensionMultiListWheelLinkagePicker on MultiListWheelLinkagePicker {
-  Future<List<int>?> show() async {
-    final result = await FlListWheel.pushFun.call(this);
-    return result is List<int> ? result : null;
-  }
+extension FlMultiListWheelLinkagePickerExtension on FlMultiListWheelLinkagePicker {
+  /// 打开选择器弹窗并返回选中的下标路径，取消时返回 null
+  Future<List<int>?> show({FlPickerPresenter? presenter}) =>
+      FlListWheel.showPicker<List<int>>(this, presenter: presenter);
 }
 
-/// 多列滚轮选择 联动
-class MultiListWheelLinkagePicker<T> extends PickerStatefulWidget<List<int>> {
-  const MultiListWheelLinkagePicker({
+/// 多列滚轮联动选择：选中某一列后，后面各列自动切换为该选项的 [FlPickerLinkageItem.children]。
+class FlMultiListWheelLinkagePicker<T> extends FlPickerStatefulWidget<List<int>> {
+  const FlMultiListWheelLinkagePicker({
     super.key,
     super.height = kPickerDefaultHeight,
     super.width = double.infinity,
@@ -140,173 +165,140 @@ class MultiListWheelLinkagePicker<T> extends PickerStatefulWidget<List<int>> {
     this.onValueChanged,
   });
 
-  /// 要渲染的数据
-  final List<PickerLinkageItem<T>> items;
+  /// 要渲染的层级数据
+  final List<FlPickerLinkageItem<T>> items;
 
-  /// 是否可以横向滚动
-  /// [isScrollable]==true 使用[SingleChildScrollView]创建,[wheelOptions]中的[itemWidth]控制宽度，如果不设置则为[kPickerDefaultWidth]
-  /// [isScrollable]==false 使用[Row] 创建每个滚动，居中显示
+  /// 是否横向滚动：true 时每列宽度为 [itemWidth] 或默认宽度；false 时各列均分宽度
   final bool isScrollable;
 
-  /// 初始默认显示的位置
+  /// 初始选中的下标路径
   final List<int> value;
 
-  /// onChanged
-  final PickerPositionIndexChanged? onChanged;
+  /// 选择下标变化回调
+  final FlPickerPositionIndexChanged? onChanged;
 
-  /// onValueChanged
-  final PickerPositionValueChanged<T>? onValueChanged;
+  /// 选择内容变化回调
+  final FlPickerPositionValueChanged<T>? onValueChanged;
 
   @override
-  State<MultiListWheelLinkagePicker<T>> createState() =>
-      _MultiListWheelLinkagePickerState<T>();
+  State<FlMultiListWheelLinkagePicker<T>> createState() => _FlMultiListWheelLinkagePickerState<T>();
 }
 
-class _MultiListWheelLinkagePickerState<T>
-    extends State<MultiListWheelLinkagePicker<T>> {
-  List<PickerLinkageItem<T>> items = [];
-  List<int> position = [];
+class _FlMultiListWheelLinkagePickerState<T> extends State<FlMultiListWheelLinkagePicker<T>> {
+  late List<FlPickerLinkageItem<T>> items;
+
+  late List<int> position;
+
+  final _FlPickerPositionTracker tracker = _FlPickerPositionTracker();
 
   @override
   void initState() {
     super.initState();
-    position = [...widget.value];
-    items = [...widget.items];
+    items = widget.items;
+    position = _resolve(widget.value);
   }
 
-  int calculateDimension(List<PickerLinkageItem> list) {
-    int highest = 0;
-    if (list.isEmpty) return highest;
-    for (var element in list) {
-      int dimension = calculateDimension(element.children);
-      if (dimension > highest) {
-        highest = dimension;
-      }
+  @override
+  void didUpdateWidget(covariant FlMultiListWheelLinkagePicker<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    items = widget.items;
+    if (!_equalsList(oldWidget.value, widget.value)) {
+      position = _resolve(widget.value);
+    } else if (!identical(oldWidget.items, widget.items)) {
+      position = _resolve(position);
     }
-    return highest + 1;
+  }
+
+  /// 校正当前下标并补齐所有层级的默认值，保证 build 期间不修改状态
+  List<int> _resolve(List<int> raw) {
+    final List<int> result = [];
+    List<FlPickerLinkageItem<T>> currentEntry = items;
+    for (int i = 0; i < raw.length && currentEntry.isNotEmpty; i++) {
+      final int value = raw[i];
+      final int index = value < 0 ? 0 : (value >= currentEntry.length ? currentEntry.length - 1 : value);
+      result.add(index);
+      currentEntry = currentEntry[index].children;
+    }
+    while (currentEntry.isNotEmpty) {
+      result.add(0);
+      currentEntry = currentEntry.first.children;
+    }
+    return result;
+  }
+
+  /// 修改某一级选择，并重置该级之后的所有选择
+  void _select(int location, int index) {
+    if (position[location] == index) return;
+    position[location] = index;
+    for (int i = location + 1; i < position.length; i++) {
+      position[i] = 0;
+    }
+    position = _resolve(position);
   }
 
   List<Widget> get buildWheels {
-    final dimension = calculateDimension(items);
-    List<Widget> list = [];
-    List<PickerLinkageItem> itemsList = items;
-    if (dimension > position.length) {
-      List.generate((dimension - position.length), (index) => position.add(0));
-    }
-    for (int i = 0; i < position.length; i++) {
-      int e = position[i];
-      if (itemsList.isNotEmpty) {
-        if (e >= itemsList.length) {
-          e = itemsList.length - 1;
-        }
-        position[i] = e;
-        list.add(listStateWheel(list: itemsList, location: i));
-        itemsList = itemsList[e].children;
-      } else {
-        break;
-      }
+    final List<Widget> list = [];
+    List<FlPickerLinkageItem<T>> itemsList = items;
+    for (int i = 0; i < position.length && itemsList.isNotEmpty; i++) {
+      final int raw = position[i];
+      final int index = raw < 0 ? 0 : (raw >= itemsList.length ? itemsList.length - 1 : raw);
+      list.add(listStateWheel(key: ValueKey<int>(i), list: itemsList, location: i));
+      itemsList = itemsList[index].children;
     }
     return list;
   }
 
   @override
-  void didUpdateWidget(covariant MultiListWheelLinkagePicker<T> oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    position = [...widget.value];
-    items = [...widget.items];
-    if (mounted) setState(() {});
-  }
-
-  @override
   Widget build(BuildContext context) {
-    Widget current = Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: buildWheels.map((item) {
-          Widget current = SizedBox(
-              width: widget.isScrollable && widget.itemWidth == null
-                  ? kPickerDefaultItemWidth
-                  : widget.itemWidth,
-              child: Align(alignment: Alignment.center, child: item));
-          return !widget.isScrollable && widget.itemWidth == null
-              ? Expanded(child: current)
-              : current;
-        }).toList());
-
-    if (widget.isScrollable) {
-      current = SingleChildScrollView(
-          scrollDirection: Axis.horizontal, child: current);
-    }
-    current =
-        SizedBox(width: widget.width, height: widget.height, child: current);
-    return widget.options == null
-        ? current
-        : PickerSubject<List<int>>(
-            options: widget.options!,
-            child: current,
-            confirmTap: () => calculatePosition);
+    final Widget current = _FlPickerColumnLayout(
+      columns: buildWheels,
+      width: widget.width,
+      height: widget.height,
+      isScrollable: widget.isScrollable,
+      itemWidth: widget.itemWidth,
+    );
+    return _buildPicker<List<int>>(options: widget.options, child: current, confirmTap: () => calculatePosition);
   }
 
-  String lastPosition = '';
-
-  List<int> get calculatePosition {
-    final p = [...position];
-    List<PickerLinkageItem> resultList = items;
-    p.removeWhere((element) {
-      if (resultList.isEmpty) {
-        return true;
-      } else {
-        resultList = (element >= resultList.length
-                ? resultList.last
-                : resultList[element])
-            .children;
-        return false;
-      }
-    });
-    return p;
-  }
+  List<int> get calculatePosition => [...position];
 
   void onChanged() {
-    final p = calculatePosition;
-    if (p.toString() != lastPosition) {
-      lastPosition = p.toString();
-      widget.onChanged?.call(p);
-      if (widget.onValueChanged != null) {
-        List<T> value = [];
-        List<PickerLinkageItem> resultList = items;
-        for (var index in p) {
-          if (index < resultList.length) {
-            value.add(resultList[index].value);
-            resultList = resultList[index].children;
-          }
-        }
-        widget.onValueChanged!(value);
-      }
+    final List<int> p = calculatePosition;
+    if (!tracker.isChanged(p)) return;
+    widget.onChanged?.call(p);
+    if (widget.onValueChanged == null) return;
+    final List<T> value = [];
+    List<FlPickerLinkageItem<T>> resultList = items;
+    for (final int index in p) {
+      if (index >= resultList.length) break;
+      value.add(resultList[index].value);
+      resultList = resultList[index].children;
     }
+    widget.onValueChanged!(value);
   }
 
-  Widget listStateWheel(
-          {required List<PickerLinkageItem> list, required int location}) =>
+  Widget listStateWheel({Key? key, required List<FlPickerLinkageItem<T>> list, required int location}) =>
       FlListWheelState(
-          count: list.length,
-          initialItem: position[location],
-          builder: (controller) => _PickerListWheel(
-              controller: controller,
-              onChanged: (int index) {
-                position[location] = index;
-              },
-              onScrollEnd: (int index) async {
-                final builder =
-                    list.length > index && list[index].children.isNotEmpty;
-                if (location != position.length - 1 || builder) {
-                  await Future.delayed(const Duration(milliseconds: 50));
-                  if (mounted) setState(() {});
-                }
-                onChanged();
-              },
-              itemBuilder: (_, int index) => Center(
-                  child: index > list.length
-                      ? list.last.child
-                      : list[index].child),
-              itemCount: list.length,
-              options: widget.wheelOptions));
+        key: key,
+        count: list.length,
+        initialItem: position[location],
+        builder: (controller) => _FlPickerListWheel(
+          controller: controller,
+          onChanged: (int index) => _select(location, index),
+          onScrollEnd: (int index) {
+            // 先同步通知外部，保证确认按钮能立刻拿到本次滚动结果
+            onChanged();
+            final bool hasChildren = list.length > index && list[index].children.isNotEmpty;
+            if (location < position.length - 1 || hasChildren) {
+              // 等当前帧结束后再重建后续列，避免在滚动通知回调中直接 setState
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(() {});
+              });
+            }
+          },
+          itemBuilder: (_, int index) => Center(child: list[index].child),
+          itemCount: list.length,
+          options: widget.wheelOptions,
+        ),
+      );
 }
